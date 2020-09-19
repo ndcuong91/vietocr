@@ -14,3 +14,7 @@ avg infer time:  0.1005243603090913 , fps: 9.947837488596893
 korea_test_set
 avg cer:  0.21790087676004638
 avg infer time:  0.10851713424879603 , fps: 9.215134613740455
+
+147 -> 235.56220074680692 when increase batchsize 1->4
+235->301 when increase 4->8
+342 fps when batch =16
