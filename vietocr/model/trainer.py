@@ -10,11 +10,11 @@ from vietocr.loader.aug import ImgAugTransform
 
 import yaml
 import torch
-from vietocr.loader.DataLoader import DataGen
-from vietocr.loader.dataloader import OCRDataset, ClusterRandomSampler, collate_fn
+from vietocr.loader.dataloader_v1 import DataGen
+from vietocr.loader.dataloader import OCRDataset, ClusterRandomSampler, Collator
 from torch.utils.data import DataLoader
 from einops import rearrange
-from torch.optim.lr_scheduler import CosineAnnealingLR, CyclicLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, CyclicLR, OneCycleLR
 
 import torchvision 
 
@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 import time
 
 class Trainer():
-    def __init__(self, config, pretrained=True):
+    def __init__(self, config, pretrained=True, augmentor=ImgAugTransform()):
 
         self.config = config
         self.model, self.vocab = build_model(config)
@@ -43,6 +43,9 @@ class Trainer():
         self.batch_size = config['trainer']['batch_size']
         self.print_every = config['trainer']['print_every']
         self.valid_every = config['trainer']['valid_every']
+        
+        self.image_aug = config['aug']['image_aug']
+        self.masked_language_model = config['aug']['masked_language_model']
 
         self.checkpoint = config['trainer']['checkpoint']
         self.export_weights = config['trainer']['export']
@@ -53,39 +56,30 @@ class Trainer():
             self.logger = Logger(logger) 
 
         if pretrained:
-            download_weights(**config['pretrain'], quiet=config['quiet'])
-            state_dict = torch.load(config['pretrain']['cached'], map_location=torch.device(self.device))
-
-            for name, param in self.model.named_parameters():
-                if state_dict[name].shape != param.shape:
-                    print('{} missmatching shape'.format(name))
-                    del state_dict[name]
-
-            self.model.load_state_dict(state_dict, strict=False)
+            weight_file = download_weights(**config['pretrain'], quiet=config['quiet'])
+            self.load_weights(weight_file)
 
         self.iter = 0
+        
+        self.optimizer = AdamW(self.model.parameters(), betas=(0.9, 0.98), eps=1e-09)
+        self.scheduler = OneCycleLR(self.optimizer, total_steps=self.num_iters, **config['optimizer'])
+#        self.optimizer = ScheduledOptim(
+#            Adam(self.model.parameters(), betas=(0.9, 0.98), eps=1e-09),
+#            #config['transformer']['d_model'], 
+#            512,
+#            **config['optimizer'])
 
-        self.optimizer = ScheduledOptim(
-            Adam(self.model.parameters(), betas=(0.9, 0.98), eps=1e-09),
-            #config['transformer']['d_model'], 
-            512,
-            **config['optimizer'])
-
-#        self.criterion = nn.CrossEntropyLoss(ignore_index=0) 
         self.criterion = LabelSmoothingLoss(len(self.vocab), padding_idx=self.vocab.pad, smoothing=0.1)
         
-#        transforms = torchvision.transforms.Compose([
-#            torchvision.transforms.ColorJitter(brightness=.1, contrast=.1, hue=.1, saturation=.1),
-#            torchvision.transforms.RandomAffine(degrees=0, scale=(3/4, 4/3))
-#            ])
-        
-        transforms = ImgAugTransform()
+        transforms = None
+        if self.image_aug:
+            transforms =  augmentor
 
         self.train_gen = self.data_gen('train_{}'.format(self.dataset_name), 
-                self.data_root, self.train_annotation, transform=transforms)
+                self.data_root, self.train_annotation, self.masked_language_model, transform=transforms)
         if self.valid_annotation:
             self.valid_gen = self.data_gen('valid_{}'.format(self.dataset_name), 
-                    self.data_root, self.valid_annotation)
+                    self.data_root, self.valid_annotation, masked_language_model=False)
 
         self.train_losses = []
         
@@ -119,7 +113,7 @@ class Trainer():
 
             if self.iter % self.print_every == 0:
                 info = 'iter: {:06d} - train loss: {:.3f} - lr: {:.2e} - load time: {:.2f} - gpu time: {:.2f}'.format(self.iter, 
-                        total_loss/self.print_every, self.optimizer.lr, 
+                        total_loss/self.print_every, self.optimizer.param_groups[0]['lr'], 
                         total_loader_time, total_gpu_time)
 
                 total_loss = 0
@@ -136,10 +130,8 @@ class Trainer():
                 print(info)
                 self.logger.log(info)
 
-                self.save_checkpoint(self.checkpoint)
-
                 if acc_full_seq > best_acc:
-                    self.save_weight(self.export_weights)
+                    self.save_weights(self.export_weights)
                     best_acc = acc_full_seq
 
             
@@ -180,8 +172,9 @@ class Trainer():
 
             if self.beamsearch:
                 translated_sentence = batch_translate_beam_search(batch['img'], self.model)
+                prob = None
             else:
-                translated_sentence = translate(batch['img'], self.model)
+                translated_sentence, prob = translate(batch['img'], self.model)
 
             pred_sent = self.vocab.batch_decode(translated_sentence.tolist())
             actual_sent = self.vocab.batch_decode(batch['tgt_output'].tolist())
@@ -194,20 +187,20 @@ class Trainer():
             if sample != None and len(pred_sents) > sample:
                 break
 
-        return pred_sents, actual_sents, img_files
+        return pred_sents, actual_sents, img_files, prob
 
     def precision(self, sample=None):
 
-        pred_sents, actual_sents, _ = self.predict(sample=sample)
+        pred_sents, actual_sents, _, _ = self.predict(sample=sample)
 
         acc_full_seq = compute_accuracy(actual_sents, pred_sents, mode='full_sequence')
         acc_per_char = compute_accuracy(actual_sents, pred_sents, mode='per_char')
     
         return acc_full_seq, acc_per_char
     
-    def visualize_prediction(self, sample=16, errorcase=False, fontname='serif', fontsize=20):
+    def visualize_prediction(self, sample=16, errorcase=False, fontname='serif', fontsize=16):
         
-        pred_sents, actual_sents, img_files = self.predict(sample)
+        pred_sents, actual_sents, img_files, probs = self.predict(sample)
 
         if errorcase:
             wrongs = []
@@ -218,7 +211,7 @@ class Trainer():
             pred_sents = [pred_sents[i] for i in wrongs]
             actual_sents = [actual_sents[i] for i in wrongs]
             img_files = [img_files[i] for i in wrongs]
-
+            probs = [probs[i] for i in wrongs]
 
         img_files = img_files[:sample]
 
@@ -231,11 +224,12 @@ class Trainer():
             img_path = img_files[vis_idx]
             pred_sent = pred_sents[vis_idx]
             actual_sent = actual_sents[vis_idx]
+            prob = probs[vis_idx]
 
             img = Image.open(open(img_path, 'rb'))
             plt.figure()
             plt.imshow(img)
-            plt.title('pred: {} - actual: {}'.format(pred_sent, actual_sent), loc='left', fontdict=fontdict)
+            plt.title('prob: {:.3f} - pred: {} - actual: {}'.format(prob, pred_sent, actual_sent), loc='left', fontdict=fontdict)
             plt.axis('off')
 
         plt.show()
@@ -280,8 +274,19 @@ class Trainer():
 
         torch.save(state, filename)
 
-    
-    def save_weight(self, filename):
+    def load_weights(self, filename):
+        state_dict = torch.load(filename, map_location=torch.device(self.device))
+
+        for name, param in self.model.named_parameters():
+            if name not in state_dict:
+                print('{} not found'.format(name))
+            elif state_dict[name].shape != param.shape:
+                print('{} missmatching shape, required {} but found {}'.format(name, param.shape, state_dict[name].shape))
+                del state_dict[name]
+
+        self.model.load_state_dict(state_dict, strict=False)
+
+    def save_weights(self, filename):
         path, _ = os.path.split(filename)
         os.makedirs(path, exist_ok=True)
        
@@ -301,7 +306,7 @@ class Trainer():
 
         return batch
 
-    def data_gen(self, lmdb_path, data_root, annotation, transform=None):
+    def data_gen(self, lmdb_path, data_root, annotation, masked_language_model=True, transform=None):
         dataset = OCRDataset(lmdb_path=lmdb_path, 
                 root_dir=data_root, annotation_path=annotation, 
                 vocab=self.vocab, transform=transform, 
@@ -310,6 +315,8 @@ class Trainer():
                 image_max_width=self.config['dataset']['image_max_width'])
 
         sampler = ClusterRandomSampler(dataset, self.batch_size, True)
+        collate_fn = Collator(masked_language_model)
+
         gen = DataLoader(
                 dataset,
                 batch_size=self.batch_size, 
@@ -326,7 +333,6 @@ class Trainer():
                 image_height = self.config['dataset']['image_height'],        
                 image_min_width = self.config['dataset']['image_min_width'],
                 image_max_width = self.config['dataset']['image_max_width'])
-        
 
         return data_gen
 
@@ -347,7 +353,10 @@ class Trainer():
 
         loss.backward()
         
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1) 
+
         self.optimizer.step()
+        self.scheduler.step()
 
         loss_item = loss.item()
 
