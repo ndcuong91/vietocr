@@ -1,6 +1,5 @@
 from PIL import Image
-import os, time, cv2
-from classifier_crnn.prepare_crnn_data import get_list_file_in_dir_and_subdirs
+import cv2
 
 from vietocr.tool.predictor import Predictor
 from vietocr.tool.config import Cfg
@@ -10,8 +9,9 @@ eval = True
 
 
 class Classifier_Vietocr:
-    def __init__(self, ckpt_path=None, gpu='0',
-                 config_name='vgg_seq2seq', write_file=False, debug=False):
+    def __init__(self, ckpt_path=None,
+                 gpu='0',
+                 config_name='vgg_seq2seq'):
         print('Classifier_Vietocr. Init')
         self.config = Cfg.load_config_from_name(config_name)
 
@@ -32,7 +32,7 @@ class Classifier_Vietocr:
             img = Image.fromarray(f)
             s = self.model.predict(img)
             if debug:
-                print(idx, s)
+                print(s)
                 cv2.imshow('sample',f)
                 cv2.waitKey(0)
             text_values.append(s)
@@ -40,31 +40,12 @@ class Classifier_Vietocr:
 
 
 def test_inference():
-    engine = Classifier_Vietocr(gpu='0',
-                                write_file=False,
-                                debug=False)
+    engine = Classifier_Vietocr(ckpt_path='/home/cuongnd/PycharmProjects/aicr/vietocr_titikid/vietocr/weights/vgg19_bn_seq2seq.pth')
 
-    begin = time.time()
-    src_dir = '/data20.04/data/data_Korea/Korea_test_Vietnamese_1106/vietnam1'
-    src_dir = '/data20.04/data/aicr/train_data_29Feb_update_30Mar_13May_refined_13Nov/handwriting/cleaned_data_02Mar/test'
+    img_path = 'sample.jpeg'
 
-    img_path = '/home/duycuong/PycharmProjects/dataset/ocr/train_data_29Feb_update_30Mar_13May_refined_23July/handwriting/' \
-               'cleaned_data_02Mar/test/AICR_test1/AICR_P0000005/0005_1.jpg'
-    img_path = ''
-    if img_path == '':
-        list_files = get_list_file_in_dir_and_subdirs(src_dir)
-        list_files = [os.path.join(src_dir,f) for f in list_files]
-    else:
-        list_files = [img_path]
-
-    numpy_list=[]
-    for file in list_files:
-        print(file)
-        cv_img = cv2.imread(file)
-        numpy_list.append(cv_img)
+    numpy_list=[cv2.imread(img_path)]
     a, b = engine.inference(numpy_list, debug=True)
-    end = time.time()
-    print('Inference time:', end - begin, 'seconds')
 
 
 if __name__ == "__main__":
