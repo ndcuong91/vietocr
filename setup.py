@@ -6,12 +6,9 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name="vietocr",
     version="0.3.4",
-    author="pbcquoc",
-    author_email="pbcquoc@gmail.com",
-    description="Transformer base text detection",
+    description="Transformer base text recognition",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/pbcquoc/vietocr",
     packages=setuptools.find_packages(),
     install_requires=[
         'einops==0.2.0',

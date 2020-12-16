@@ -8,39 +8,6 @@ from vietocr.tool.config import Cfg
 debug = False
 eval = True
 
-# total_cer = 0
-# total_inference_time = 0
-# print('Total files:', len(list_files))
-# for idx, f in enumerate(list_files):
-#     img_path = os.path.join(src_dir, f)
-#     label_path = img_path.replace('.jpg', '.txt').replace('.png', '.txt').replace('.PNG', '.txt').replace('.JPG',
-#                                                                                                           '.txt')
-#     if not os.path.exists(label_path):
-#         eval = False
-#
-#     img = Image.open(img_path)
-#     Image.fromarray()
-#     begin = time.time()
-#     s = detector.predict(img)
-#     end = time.time()
-#     if eval:
-#         with open(label_path, 'r', encoding='utf-8') as f:
-#             label = f.readline()
-#         cer = cer_loss_one_image(label, s)
-#         total_cer += cer
-#     total_inference_time += (end - begin)
-#     if debug:
-#         print('Predict:', s)
-#         img_cv = cv2.imread(img_path)
-#         cv2.imshow('img', img_cv)
-#         cv2.waitKey(0)
-#     else:
-#         if eval:
-#             print(idx, 'pred:', s, ', gt:', label, ', cer:', round(cer, 2), ', time:', round(end - begin, 4))
-#
-# print('avg cer: ', total_cer / len(list_files))
-# print('avg infer time: ', total_inference_time / len(list_files), ', fps:', len(list_files) / total_inference_time)
-
 
 class Classifier_Vietocr:
     def __init__(self, ckpt_path=None, gpu='0',
@@ -61,13 +28,8 @@ class Classifier_Vietocr:
         print('Classifier_Vietocr. Inference',len(numpy_list),'boxes')
         text_values = []
         prob_value = []
-        # t = tqdm(iter(val_loader), total=len(val_loader), desc='Classifier_CRNN. Inference...')
         for idx, f in enumerate(numpy_list):
-            if idx <70:
-                continue
             img = Image.fromarray(f)
-            #img.show()
-            #time.sleep(4)
             s = self.model.predict(img)
             if debug:
                 print(idx, s)
@@ -106,5 +68,4 @@ def test_inference():
 
 
 if __name__ == "__main__":
-    # ample_codes()
     test_inference()
