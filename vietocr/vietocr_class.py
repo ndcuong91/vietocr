@@ -1,11 +1,9 @@
 from PIL import Image
 import os, time, cv2
-from classifier_crnn.prepare_crnn_data import get_list_file_in_dir_and_subdirs, get_list_file_in_folder
+from classifier_crnn.prepare_crnn_data import get_list_file_in_dir_and_subdirs
 
 from vietocr.tool.predictor import Predictor
 from vietocr.tool.config import Cfg
-import gc
-from datetime import datetime
 
 debug = False
 eval = True
@@ -59,17 +57,22 @@ class Classifier_Vietocr:
         self.config['predictor']['beamsearch'] = False
         self.model = Predictor(self.config)
 
-    def inference(self, numpy_list):
-        print('Classifier_Vietocr. inference')
+    def inference(self, numpy_list, debug=False):
+        print('Classifier_Vietocr. Inference',len(numpy_list),'boxes')
         text_values = []
         prob_value = []
         # t = tqdm(iter(val_loader), total=len(val_loader), desc='Classifier_CRNN. Inference...')
         for idx, f in enumerate(numpy_list):
+            if idx <70:
+                continue
             img = Image.fromarray(f)
             #img.show()
             #time.sleep(4)
             s = self.model.predict(img)
-            print(s)
+            if debug:
+                print(idx, s)
+                cv2.imshow('sample',f)
+                cv2.waitKey(0)
             text_values.append(s)
         return text_values, prob_value
 
@@ -81,7 +84,7 @@ def test_inference():
 
     begin = time.time()
     src_dir = '/data20.04/data/data_Korea/Korea_test_Vietnamese_1106/vietnam1'
-    src_dir = '/data20.04/data/data_Korea/Cello_Vietnamese/crnn_extend_True_y_ratio_0.05_min_y_4_min_x_2'
+    src_dir = '/data20.04/data/aicr/train_data_29Feb_update_30Mar_13May_refined_13Nov/handwriting/cleaned_data_02Mar/test'
 
     img_path = '/home/duycuong/PycharmProjects/dataset/ocr/train_data_29Feb_update_30Mar_13May_refined_23July/handwriting/' \
                'cleaned_data_02Mar/test/AICR_test1/AICR_P0000005/0005_1.jpg'
@@ -91,11 +94,13 @@ def test_inference():
         list_files = [os.path.join(src_dir,f) for f in list_files]
     else:
         list_files = [img_path]
-    import cv2
+
+    numpy_list=[]
     for file in list_files:
         print(file)
         cv_img = cv2.imread(file)
-        a, b = engine.inference([cv_img])
+        numpy_list.append(cv_img)
+    a, b = engine.inference(numpy_list, debug=True)
     end = time.time()
     print('Inference time:', end - begin, 'seconds')
 
