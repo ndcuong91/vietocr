@@ -128,6 +128,7 @@ def build_model(config):
             config['seq_modeling'])
     
     model = model.to(device)
+    #model = model.cuda()
 
     return model, vocab
 
