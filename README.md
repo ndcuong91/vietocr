@@ -1,9 +1,10 @@
 # VietOCR
-**Các bạn vui lòng cập nhật lên version vietocr==0.3.2 để không xảy ra lỗi.**
+**Các bạn vui lòng cập nhật lên version vietocr==0.3.5 để không xảy ra lỗi.**
 <p align="center">
 <img src="https://github.com/pbcquoc/vietocr/raw/master/image/sample.png" width="1000" height="300">
 </p>
-Trong project này, mình cài đặt mô hình Transformer OCR nhận dạng chữ viết tay, chữ đánh máy cho Tiếng Việt. Kiến trúc mô hình là sự kết hợp tuyệt vời giữ mô hình CNN và Transformer (là mô hình nền tảng của BERT khá nổi tiếng). Mô hình TransformerOCR có rất nhiều ưu điểm so với kiến trúc của mô hình CRNN đã được mình cài đặt. Các bạn có thể đọc [tại]() đây về kiến trúc và cách huấn luyện mô hình với các tập dữ liệu khác nhau. 
+
+Trong project này, mình cài đặt mô hình Transformer OCR nhận dạng chữ viết tay, chữ đánh máy cho Tiếng Việt. Kiến trúc mô hình là sự kết hợp tuyệt vời giữ mô hình CNN và Transformer (là mô hình nền tảng của BERT khá nổi tiếng). Mô hình TransformerOCR có rất nhiều ưu điểm so với kiến trúc của mô hình CRNN đã được mình cài đặt. Các bạn có thể đọc [tại](https://pbcquoc.github.io/vietocr) đây về kiến trúc và cách huấn luyện mô hình với các tập dữ liệu khác nhau. 
 
 Mô hình VietOCR có tính tổng quát cực tốt, thậm chí có độ chính xác khá cao trên một bộ dataset mới mặc dù mô hình chưa được huấn luyện bao giờ. 
 
@@ -14,10 +15,10 @@ Mô hình VietOCR có tính tổng quát cực tốt, thậm chí có độ chí
 # Cài Đặt
 Để cài đặt các bạn gõ lệnh sau
 ```
-pip install vietocr==0.3.2
+pip install vietocr==0.3.5
 ```
 # Quick Start
-Các bạn tham khảo notebook [này](https://colab.research.google.com/drive/1GVRKGFPsmq_xKJbOuSplrIDJZYp-IyzW?usp=sharing) để biết cách sử dụng nhé. 
+Các bạn tham khảo notebook [này](https://github.com/pbcquoc/vietocr/blob/master/vietocr_gettingstart.ipynb) để biết cách sử dụng nhé. 
 
 # Model Zoo 
 Thư viện này cài đặt cả 2 kiểu seq model đó là attention seq2seq và transfomer. Seq2seq có tốc độ dự đoán rất nhanh và được dùng trong industry khá nhiều, tuy nhiên transformer lại chính xác hơn nhưng lúc dự đoán lại khá chậm. Do đó mình cung cấp cả 2 loại cho các bạn lựa chọn. 
