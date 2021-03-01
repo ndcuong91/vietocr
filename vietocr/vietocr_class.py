@@ -63,17 +63,14 @@ class Classifier_Vietocr:
         prob_value = []
         # t = tqdm(iter(val_loader), total=len(val_loader), desc='Classifier_CRNN. Inference...')
         for idx, f in enumerate(numpy_list):
-            if idx <70:
-                continue
             img = Image.fromarray(f)
-            #img.show()
-            #time.sleep(4)
-            s = self.model.predict(img)
+            s, prob= self.model.predict(img, True)
             if debug:
-                print(idx, s)
+                print( round(prob,3), s)
                 cv2.imshow('sample',f)
                 cv2.waitKey(0)
             text_values.append(s)
+            prob_value.append(prob)
         return text_values, prob_value
 
 
